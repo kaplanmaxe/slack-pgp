@@ -1,7 +1,7 @@
 import express from 'express';
 import http from 'http';
 import bodyParser from 'body-parser';
-import { spawn } from 'child_process';
+import { spawn, execFile } from 'child_process';
 import request from 'request';
 
 require('dotenv').config();
@@ -11,12 +11,16 @@ http.createServer(app).listen(process.env.PORT);
 app.use(bodyParser.urlencoded({ extended: false }));
 
 /**
- * GPG endpoint
+ * Encrypt endpoint
  */
-app.post('/api/v1/gpg', (req, res) => {
+app.post('/api/v1/encrypt', (req, res) => {
   const msg = parseMessage(req.body.text);
-  // Need to be able to use | so we use sh
-  const process = spawn('sh', ['-c', `echo ${msg.message} | gpg --encrypt --armor -r ${msg.key}`]);
+  // Need to be able to use | so we use sh.
+  // We always need to trust or GPG will throw an err
+  const process = spawn(
+    'sh',
+    ['-c', `echo ${msg.message} | gpg --encrypt --armor -r ${msg.key} --trust-model always`],
+  );
 
   process.stdout.on('data', data => {
     res.status(200).json({ text: data.toString() });
@@ -27,6 +31,19 @@ app.post('/api/v1/gpg', (req, res) => {
   });
 });
 
+/**
+ * Import endpoint
+ */
+app.post('/api/v1/import', (req, res) => {
+  execFile(process.env.GPG_PATH, ['--keyserver', 'pgpkeys.mit.edu', '--recv', req.body.text], err => {
+    if (err) res.json({ text: 'Key not found on key server.' });
+    res.json({ text: 'Key was successfully imported!' });
+  });
+});
+
+/**
+ * Auth endpoint
+ */
 app.get('/api/v1/auth', (req, res) => {
   const options = {
     uri: `https://slack.com/api/oauth.access?code=${req.query.code}&client_id=${process.env.CLIENT_ID}&client_secret=${process.env.CLIENT_SECRET}&redirect_uri=${process.env.REDIRECT_URI}`,
@@ -48,9 +65,8 @@ app.get('/api/v1/auth', (req, res) => {
  * @return {string}
  */
 function parseMessage(msg) {
-  const message = msg.split(' ');
   return {
-    message: message[0],
-    key: message[1],
+    message: msg.match(/"([^"]*)"/)[1],
+    key: msg.split('"')[2].trim(),
   };
 }
