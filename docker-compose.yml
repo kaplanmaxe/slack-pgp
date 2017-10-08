@@ -1,0 +1,23 @@
+version: '2'
+services:
+    mongo:
+      image: mongo:3.4.9
+      container_name: mongo
+      networks:
+        - mongo
+      ports:
+        - "27009:27017"
+    encryption:
+      image: encryption
+      container_name: encryption
+      networks:
+        - encryption
+      ports:
+        - "8888:8888"
+networks:
+  mongo:
+    external:
+      name: mongo
+  encryption:
+    external:
+      name: encryption

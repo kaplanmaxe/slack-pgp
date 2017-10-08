@@ -3,12 +3,19 @@ import http from 'http';
 import bodyParser from 'body-parser';
 import { spawn, execFile } from 'child_process';
 import request from 'request';
+import { MongoClient } from 'mongodb';
 
 require('dotenv').config();
 
 const app = express();
 http.createServer(app).listen(process.env.PORT);
 app.use(bodyParser.urlencoded({ extended: false }));
+let db;
+
+MongoClient.connect(process.env.MONGO_URL, { poolSize: 4 }, (err, database) => {
+  if (err) console.error('Error connectiong to db');
+  db = database;
+});
 
 /**
  * Encrypt endpoint
@@ -35,7 +42,9 @@ app.post('/api/v1/encrypt', (req, res) => {
  * Import endpoint
  */
 app.post('/api/v1/import', (req, res) => {
-  execFile(process.env.GPG_PATH, ['--keyserver', 'pgpkeys.mit.edu', '--recv', req.body.text], err => {
+  const msg = parseMessage(req.body.text);
+  execFile(process.env.GPG_PATH, ['--keyserver', 'pgpkeys.mit.edu', '--recv', msg.key], err => {
+    db.collection(process.env.MONGO_COLLECTION).insertOne({ key: msg.key, username: msg.message });
     if (err) res.json({ text: 'Key not found on key server.' });
     res.json({ text: 'Key was successfully imported!' });
   });
