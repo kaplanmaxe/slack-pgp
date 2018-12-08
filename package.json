@@ -14,7 +14,7 @@
     "dotenv": "^4.0.0",
     "express": "^4.16.1",
     "mongodb": "^2.2.31",
-    "request": "^2.83.0"
+    "request": "^2.84.0"
   },
   "devDependencies": {
     "babel-core": "^6.26.0",
